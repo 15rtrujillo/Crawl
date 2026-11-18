@@ -9,6 +9,5 @@ export type Tile = (typeof Tile)[keyof typeof Tile];
 
 export type Dungeon = readonly ( readonly Tile[])[];
 
-export const onTile = (d: Dungeon, pos: Position): Tile | undefined => {
-  return d[pos.y]?.[pos.x];
-};
+export const tileAt = (d: Dungeon, pos: Position): Tile | undefined =>
+  d[pos.y]?.[pos.x];
