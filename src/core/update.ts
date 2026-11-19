@@ -1,7 +1,7 @@
 import {type GameState, withEnemy, withPlayer} from "./models/gameState.ts";
 import {Action, movementDeltas} from "./action.ts";
 import {type Enemy, moveTo} from "./models/entity.ts";
-import {add, distanceTo, equals, type Position} from "./models/position.ts";
+import {add, manhattanDistance, equals, type Position, euclideanSq} from "./models/position.ts";
 import {Tile, tileAt} from "./models/dungeon.ts";
 
 const isOccupied = (s: GameState, pos: Position): boolean =>
@@ -52,10 +52,9 @@ const enemiesTurn = (s: GameState): GameState => {
     const enemy = afterEnemies.enemies.find(e => e.id === id);
     if (!enemy) continue;
 
-    const distanceToPlayer = distanceTo(enemy.position, s.player.position);
-    if (distanceToPlayer === 1) {
+    if (manhattanDistance(enemy.position, afterEnemies.player.position) === 1) {
       // attack
-    } else if (distanceToPlayer <= enemy.lineOfSight) {
+    } else if (euclideanSq(enemy.position, afterEnemies.player.position) <= Math.pow(enemy.detectionRadius, 2)) {
       let tryMoveToPlayer = moveEnemyRelToPlayer(afterEnemies, enemy, "x");
       if (tryMoveToPlayer === afterEnemies) {
         tryMoveToPlayer = moveEnemyRelToPlayer(afterEnemies, enemy, "y");

@@ -15,7 +15,7 @@ export interface Player extends Entity {
 }
 
 export interface Enemy extends Entity {
-  readonly lineOfSight: number;
+  readonly detectionRadius: number;
   readonly goldDrop: number;
   readonly potionDropChance: number;
 }
