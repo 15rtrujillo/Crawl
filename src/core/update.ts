@@ -7,11 +7,13 @@ import {Tile, tileAt} from "./models/dungeon.ts";
 const isOccupied = (s: GameState, pos: Position): boolean =>
   equals(s.player.position, pos) || s.enemies.some(e => equals(e.position, pos));
 
+const canMoveTo = (s: GameState, pos: Position): boolean =>
+  tileAt(s.dungeon, pos) === Tile.floor && !isOccupied(s, pos);
+
 const tryMovePlayer = (s: GameState, delta: Position): GameState => {
   const newPos = add(s.player.position, delta);
-  const tile = tileAt(s.dungeon, newPos)
-  if (tile === Tile.floor && !isOccupied(s, newPos)) {
-    return withPlayer(s, p => moveTo(p, newPos))
+  if (canMoveTo(s, newPos)) {
+    return withPlayer(s, p => moveTo(p, newPos));
   }
 
   return s;
@@ -29,20 +31,20 @@ const playerTurn = (s: GameState, action: Action): GameState => {
   return s;
 };
 
-const moveEnemyRelToPlayer = (s: GameState, e: Enemy, axis: "x" | "y"): GameState => {
-  const sign = Math.sign(
-    axis === "x"
-      ? s.player.position.x - e.position.x
-      : s.player.position.y - e.position.y
-  );
-  if (sign !== 0) {
-    const newPos = add(e.position, axis === "x" ? { x: sign, y: 0 } : { x: 0, y: sign });
-    const tile = tileAt(s.dungeon, newPos);
-    if (tile === Tile.floor && !isOccupied(s, newPos)) {
+const moveToPlayer = (s: GameState, e: Enemy): GameState => {
+  const dx = s.player.position.x - e.position.x;
+  const dy = s.player.position.y - e.position.y;
+  const xStep = { x: Math.sign(dx), y: 0 };
+  const yStep = { x: 0, y: Math.sign(dy) };
+  const steps = Math.abs(dx) > Math.abs(dy) ? [xStep, yStep] : [yStep, xStep];
+
+  for (const step of steps) {
+    if (step.x === 0 && step.y === 0) continue;
+    const newPos = add(e.position, step);
+    if (canMoveTo(s, newPos)) {
       return withEnemy(s, e.id, en => moveTo(en, newPos));
     }
   }
-
   return s;
 };
 
@@ -54,12 +56,8 @@ const enemiesTurn = (s: GameState): GameState => {
 
     if (manhattanDistance(enemy.position, afterEnemies.player.position) === 1) {
       // attack
-    } else if (euclideanSq(enemy.position, afterEnemies.player.position) <= Math.pow(enemy.detectionRadius, 2)) {
-      let tryMoveToPlayer = moveEnemyRelToPlayer(afterEnemies, enemy, "x");
-      if (tryMoveToPlayer === afterEnemies) {
-        tryMoveToPlayer = moveEnemyRelToPlayer(afterEnemies, enemy, "y");
-      }
-      afterEnemies = tryMoveToPlayer;
+    } else if (euclideanSq(enemy.position, afterEnemies.player.position) <= enemy.detectionRadius * enemy.detectionRadius) {
+      afterEnemies = moveToPlayer(afterEnemies, enemy);
     } else {
       // Randomly move (or don't)
     }
