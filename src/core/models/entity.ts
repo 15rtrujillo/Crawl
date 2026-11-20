@@ -3,6 +3,7 @@ import type {Position} from "./position.ts";
 export interface Entity {
   readonly id: string;
   readonly name: string;
+  readonly rep: string;
   readonly position: Position;
   readonly hp: number;
   readonly maxHp: number;

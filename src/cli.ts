@@ -1,0 +1,71 @@
+import {emitKeypressEvents, type Key} from "node:readline";
+import {type GameState, createTestGame} from "./core/models/gameState.ts";
+import {Tile, tileAt} from "./core/models/dungeon.ts";
+import {Action} from "./core/action.ts";
+import {update} from "./core/update.ts";
+import type {Position} from "./core/models/position.ts";
+
+const render = (s: GameState): string => {
+  const screen: string[][] = s.dungeon.map(row =>
+    row.map(c => c === Tile.wall ? "#" : " "));
+
+  for (const enemy of s.enemies) {
+    const x = enemy.position.x;
+    const y = enemy.position.y;
+    if (screen[y]?.[x] !== undefined) {
+      screen[y][x] = enemy.rep;
+    }
+  }
+
+  const x = s.player.position.x;
+  const y = s.player.position.y;
+  if (screen[y]?.[x] !== undefined) {
+    screen[y][x] = s.player.rep;
+  }
+
+  return screen.map(row => row.join("")).join("\n");
+};
+
+const keyActions: Record<string, Action> = {
+  w: Action.moveUp,
+  a: Action.moveLeft,
+  s: Action.moveDown,
+  d: Action.moveRight,
+  up: Action.moveUp,
+  left: Action.moveLeft,
+  down: Action.moveDown,
+  right: Action.moveRight,
+  p: Action.drinkPotion,
+};
+
+const draw = (s: GameState): void => {
+  process.stdout.write(
+    "\x1b[2J\x1b[H" + render(s) + `\nHP ${s.player.hp}/${s.player.maxHp}\nWASD/arrows: move  p: potion  q: quit\n`,
+  );
+};
+
+const quit = (): void => {
+  if (process.stdin.isTTY) process.stdin.setRawMode(false);
+  process.stdin.pause();
+};
+
+const main = (): void => {
+  let state = createTestGame(Date.now());
+
+  emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+
+  process.stdin.on("keypress", (_str: string | undefined, key: Key | undefined) => {
+    if (key?.name === "q" || (key?.ctrl && key.name === "c")) return quit();
+
+    const action = key?.name !== undefined ? keyActions[key.name] : undefined;
+    if (action === undefined) return;
+
+    state = update(state, action);
+    draw(state);
+  });
+
+  draw(state);
+};
+
+main();
