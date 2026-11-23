@@ -10,13 +10,16 @@ export interface GameState {
 }
 
 export const getEntity = (s: GameState, id: string): Entity | undefined =>
-  s.player.id === id ? s.player : s.enemies.find(e => e.id === id);
+  s.player.id === id ? s.player : getEnemy(s, id);
 
 export const withEntity = (s: GameState, id: string, f: <E extends Entity>(e: E) => E): GameState =>
   s.player.id === id ? withPlayer(s, f) : withEnemy(s, id, f);
 
 export const withPlayer = (s: GameState, f: (p: Player) => Player): GameState =>
   ({ ...s, player: f(s.player) });
+
+export const getEnemy = (s: GameState, id: string): Enemy | undefined =>
+  s.enemies.find(e => e.id === id);
 
 export const withEnemy = (s: GameState, id: string, f: (e: Enemy) => Enemy): GameState => {
   if (!s.enemies.some(e => e.id === id)) return s;

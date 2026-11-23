@@ -1,4 +1,4 @@
-import {type GameState, getEntity, withEnemy, withEntity, withPlayer, withRng} from "./models/gameState.ts";
+import {type GameState, getEnemy, getEntity, withEnemy, withEntity, withPlayer, withRng} from "./models/gameState.ts";
 import {Action, movementDeltas} from "./action.ts";
 import {damage, type Enemy, moveTo} from "./models/entity.ts";
 import {add, manhattanDistance, equals, type Position, euclideanSq} from "./models/position.ts";
@@ -14,6 +14,25 @@ const isOccupied = (s: GameState, pos: Position): boolean =>
 const canMoveTo = (s: GameState, pos: Position): boolean =>
   tileAt(s.dungeon, pos) === Tile.floor && !isOccupied(s, pos);
 
+const death = (s: GameState, id: string, emit: Emit): GameState => {
+  if (id === s.player.id) {
+    emit({ type: "playerDied" });
+    return s;
+  }
+
+  const enemy = getEnemy(s, id);
+  if (!enemy) return s;
+
+  const [roll, afterRng] = withRng(s, rng => nextInt(rng, 1, 100));
+  const potion = roll <= enemy.potionDropChance;
+  emit({ type: "died", enemyName: enemy.name });
+  emit({ type: "lootDropped", gold: enemy.goldDrop, potion });
+  return {
+    ...withPlayer(afterRng, p => ({ ...p, gold: p.gold + enemy.goldDrop, potions: p.potions + (potion ? 1 : 0) })),
+    enemies: afterRng.enemies.filter(e => e.id !== id),
+  };
+};
+
 const attack = (s: GameState, attackerId: string, targetId: string, emit: Emit): GameState => {
   const attacker = getEntity(s, attackerId);
   if (!attacker) return s;
@@ -22,7 +41,9 @@ const attack = (s: GameState, attackerId: string, targetId: string, emit: Emit):
 
   const [roll, afterRng] = withRng(s, rng => nextInt(rng, 1, attacker.attackPower));
   emit({ type: "attacked", attackerId, targetId, amount: roll });
-  return withEntity(afterRng, targetId, e => damage(e, roll));
+  const afterDamage = withEntity(afterRng, targetId, e => damage(e, roll));
+  const after = getEntity(afterDamage, targetId);
+  return after && after.hp <= 0 ? death(afterDamage, targetId, emit) : afterDamage;
 };
 
 const tryMovePlayer = (s: GameState, delta: Position, emit: Emit): PlayerTurn => {
@@ -70,14 +91,16 @@ const moveToPlayer = (s: GameState, e: Enemy): GameState => {
   return s;
 };
 
-const enemiesTurn = (s: GameState, _emit: Emit): GameState => {
+const enemiesTurn = (s: GameState, emit: Emit): GameState => {
   let afterEnemies = s;
   for (const { id } of s.enemies) {
-    const enemy = afterEnemies.enemies.find(e => e.id === id);
+    if (afterEnemies.player.hp === 0) break;
+
+    const enemy = getEnemy(afterEnemies, id);
     if (!enemy) continue;
 
     if (manhattanDistance(enemy.position, afterEnemies.player.position) === 1) {
-      // attack
+      afterEnemies = attack(afterEnemies, id, s.player.id, emit)
     } else if (euclideanSq(enemy.position, afterEnemies.player.position) <= enemy.detectionRadius * enemy.detectionRadius) {
       afterEnemies = moveToPlayer(afterEnemies, enemy);
     } else {

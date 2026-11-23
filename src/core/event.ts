@@ -5,7 +5,7 @@ export type GameEvent =
   | { type: "playerMoved"; to: Position }
   | { type: "moveBlocked"; at: Position }
   | { type: "attacked"; attackerId: string; targetId: string; amount: number }
-  | { type: "died"; entityId: string }
+  | { type: "died"; enemyName: string }
   | { type: "potionDrunk"; healed: number }
   | { type: "noPotions" }
   | { type: "lootDropped"; gold: number; potion: boolean }
