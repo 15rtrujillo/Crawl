@@ -1,9 +1,21 @@
 import {emitKeypressEvents, type Key} from "node:readline";
-import {type GameState, createTestGame} from "./core/models/gameState.ts";
-import {Tile, tileAt} from "./core/models/dungeon.ts";
+import {type GameState, createTestGame, getEntity} from "./core/models/gameState.ts";
+import {Tile} from "./core/models/dungeon.ts";
 import {Action} from "./core/action.ts";
 import {update} from "./core/update.ts";
-import type {Position} from "./core/models/position.ts";
+import type {GameEvent} from "./core/event.ts";
+
+const keyActions: Record<string, Action> = {
+  w: Action.moveUp,
+  a: Action.moveLeft,
+  s: Action.moveDown,
+  d: Action.moveRight,
+  up: Action.moveUp,
+  left: Action.moveLeft,
+  down: Action.moveDown,
+  right: Action.moveRight,
+  p: Action.drinkPotion,
+};
 
 const render = (s: GameState): string => {
   const screen: string[][] = s.dungeon.map(row =>
@@ -26,22 +38,40 @@ const render = (s: GameState): string => {
   return screen.map(row => row.join("")).join("\n");
 };
 
-const keyActions: Record<string, Action> = {
-  w: Action.moveUp,
-  a: Action.moveLeft,
-  s: Action.moveDown,
-  d: Action.moveRight,
-  up: Action.moveUp,
-  left: Action.moveLeft,
-  down: Action.moveDown,
-  right: Action.moveRight,
-  p: Action.drinkPotion,
-};
-
-const draw = (s: GameState): void => {
+const draw = (s: GameState, e?: readonly GameEvent[]): void => {
   process.stdout.write(
     "\x1b[2J\x1b[H" + render(s) + `\nHP ${s.player.hp}/${s.player.maxHp}\nWASD/arrows: move  p: potion  q: quit\n`,
   );
+
+  if (!e) return;
+  for (const event of e) {
+    let message: string;
+    switch (event.type) {
+      case "playerMoved":
+        message = `You moved to (${event.to.x}, ${event.to.y}).`;
+        break;
+      case "moveBlocked":
+        message = "You cannot move there!";
+        break;
+      case "attacked": {
+        const attacker = getEntity(s, event.attackerId);
+        if (!attacker) continue;
+        const target = getEntity(s, event.targetId);
+        if (!target) continue;
+
+        if (event.attackerId === s.player.id) {
+          message = `You hit ${target.name} for ${event.amount}!`;
+        } else {
+          message = `${attacker.name} hit you for ${event.amount}!`;
+        }
+        break;
+      }
+      default:
+        message = "Nothing interesting happened...";
+        break;
+    }
+    process.stdout.write(message + "\n");
+  }
 };
 
 const quit = (): void => {
@@ -61,8 +91,9 @@ const main = (): void => {
     const action = key?.name !== undefined ? keyActions[key.name] : undefined;
     if (action === undefined) return;
 
-    state = update(state, action);
-    draw(state);
+    const result = update(state, action);
+    state = result.state;
+    draw(state, result.events);
   });
 
   draw(state);
